@@ -48,12 +48,12 @@ func NewApplication(cfg configs.Config) (*Application, error) {
 		cfg:         cfg,
 		rateLimiter: NewRateLimiter(cfg.Limiter.RPS, cfg.Limiter.Burst),
 		logger:      logger,
-		db: db,
-		accounts: account.Model{},
-		users: user.Model{},
-		tokens: token.Model{},
-		permissions: permission.Model{},
-		auditLogs: audit.Model{},
+		db:          db,
+		accounts:    account.Model{DB: db},
+		users:       user.Model{DB: db},
+		tokens:      token.Model{DB: db},
+		permissions: permission.Model{DB: db},
+		auditLogs:   audit.Model{DB: db},
 		mailer:      mailer,
 	}
 	return app, nil
