@@ -32,6 +32,9 @@ paths:
       responses:
         "200":
           description: Accounts retrieved
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -64,6 +67,8 @@ paths:
               schema:
                 type: string
                 example: /v1/accounts/1
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -98,10 +103,15 @@ paths:
       responses:
         "200":
           description: Account retrieved
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
         "403":
@@ -136,6 +146,9 @@ paths:
       responses:
         "200":
           description: Funds deposited
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -178,6 +191,9 @@ paths:
       responses:
         "200":
           description: Funds withdrawn
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -212,6 +228,9 @@ paths:
       responses:
         "200":
           description: Funds transferred
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -247,12 +266,17 @@ paths:
       responses:
         "202":
           description: User registered
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/UserResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -276,6 +300,9 @@ paths:
       responses:
         "200":
           description: User activated
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -284,6 +311,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthenticated"
+        "409":
+          $ref: "#/components/responses/Conflict"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -307,6 +336,9 @@ paths:
       responses:
         "201":
           description: Authentication token created
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -314,7 +346,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
-          $ref: "#/components/responses/Unauthenticated"
+          $ref: "#/components/responses/InvalidCredentials"
         "422":
           $ref: "#/components/responses/ValidationFailed"
         "429":
@@ -332,10 +364,15 @@ paths:
       responses:
         "200":
           description: Service status
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthCheck"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -351,6 +388,9 @@ paths:
       responses:
         "200":
           description: Request finished
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestID"
           content:
             application/json:
               schema:
@@ -359,6 +399,8 @@ paths:
                   message:
                     type: string
                     example: finished
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
         "429":
           $ref: "#/components/responses/RateLimited"
         "500":
@@ -605,9 +647,19 @@ components:
       type: http
       scheme: bearer
 
+  headers:
+    XRequestID:
+      description: Unique request identifier, echoed from the request or generated when absent
+      schema:
+        type: string
+        format: uuid
+
   responses:
     BadRequest:
       description: Malformed request or unreadable JSON body
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
@@ -619,36 +671,75 @@ components:
           description: Always `Bearer` on 401
           schema:
             type: string
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InvalidCredentials:
+      description: Invalid email or password
+      headers:
+        WWW-Authenticate:
+          description: Always `Bearer` on 401
+          schema:
+            type: string
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Edit conflict, the record was modified concurrently
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     Forbidden:
       description: Account not activated or permission denied
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     ValidationFailed:
-      description: Request body failed validation
+      description: Request failed validation or a business rule (e.g. insufficient balance, same-account transfer)
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: Resource not found
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     RateLimited:
       description: Too many requests
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
     InternalError:
       description: Unexpected server error
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestID"
       content:
         application/json:
           schema:
