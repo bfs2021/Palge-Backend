@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nongpal/Palge-Backend/internal/data"
+	"github.com/nongpal/Palge-Backend/internal/audit"
 )
 
 type envelope map[string]any
@@ -85,11 +85,11 @@ func (app *Application) writeJSON(w http.ResponseWriter, status int, data envelo
 	return nil
 }
 
-func (app *Application) recordAuditLog(r *http.Request, auditLog *data.AuditLog) {
+func (app *Application) recordAuditLog(r *http.Request, auditLog *audit.AuditLog) {
 	auditLog.IPAddress = clientIP(r)
 	auditLog.UserAgent = r.UserAgent()
 
-	if err := app.models.AuditLogs.Insert(auditLog); err != nil {
+	if err := app.auditLogs.Insert(auditLog); err != nil {
 		app.logger.Error(
 			"failed to insert audit log",
 			"error", err,
