@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/nongpal/Palge-Backend/internal/apperr"
-	"github.com/nongpal/Palge-Backend/internal/data"
+	"github.com/nongpal/Palge-Backend/internal/audit"
+	"github.com/nongpal/Palge-Backend/internal/token"
+	"github.com/nongpal/Palge-Backend/internal/user"
 	"github.com/nongpal/Palge-Backend/internal/validator"
 )
 
@@ -22,19 +24,19 @@ func (app *Application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 
 	v := validator.New()
 
-	data.ValidateEmail(v, input.Email)
-	data.ValidatePasswordPlaintext(v, input.Password)
+	user.ValidateEmail(v, input.Email)
+	user.ValidatePasswordPlaintext(v, input.Password)
 
 	if !v.Valid() {
 		app.writeError(w, r, apperr.WithFields(apperr.CodeValidationFailed, v.Errors))
 		return
 	}
 
-	user, err := app.models.Users.GetByEmail(input.Email)
+	user, err := app.users.GetByEmail(input.Email)
 	if err != nil {
 		switch {
 		case apperr.Is(err, apperr.CodeRecordNotFound):
-			app.recordAuditLog(r, &data.AuditLog{
+			app.recordAuditLog(r, &audit.AuditLog{
 				UserID:     nil,
 				Action:     "login",
 				Resource:   "user",
@@ -56,7 +58,7 @@ func (app *Application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 	}
 
 	if !match {
-		app.recordAuditLog(r, &data.AuditLog{
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     nil,
 			Action:     "login",
 			Resource:   "user",
@@ -68,13 +70,13 @@ func (app *Application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 		return
 	}
 
-	token, err := app.models.Tokens.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
+	token, err := app.tokens.New(user.ID, 24*time.Hour, token.ScopeAuthentication)
 	if err != nil {
 		app.writeError(w, r, err)
 		return
 	}
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     &user.ID,
 		Action:     "login",
 		Resource:   "user",
