@@ -99,7 +99,7 @@ func (rl *RateLimiter) StopJanitor() {
 
 func (app *Application) middlewareRateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if app.cfg.rl.enabled {
+		if app.cfg.Limiter.Enabled {
 			ip := app.getRealIP(r)
 			if !app.rateLimiter.Allow(ip) {
 				app.writeError(w, r, apperr.New(apperr.CodeRateLimited))
@@ -145,7 +145,7 @@ func (app *Application) isTrustedProxies(ip string) bool {
 		return false
 	}
 
-	for _, cidr := range app.cfg.rl.trustedProxies {
+	for _, cidr := range app.cfg.Limiter.TrustedProxies {
 		prefix, err := netip.ParsePrefix(cidr)
 		if err == nil && prefix.Contains(addr) {
 			return true

@@ -41,7 +41,7 @@ func (app *Application) Run() error {
 			shutdownErr <- err
 		}
 
-		if app.cfg.rl.enabled {
+		if app.cfg.Limiter.Enabled {
 			app.rateLimiter.StopJanitor()
 		}
 
@@ -57,10 +57,10 @@ func (app *Application) Run() error {
 		"env", app.cfg.Env,
 	)
 
-	if app.cfg.rl.enabled {
+	if app.cfg.Limiter.Enabled {
 		app.rateLimiter.StartJanitor(
-			time.Duration(app.cfg.rl.janitor_interval),
-			time.Duration(app.cfg.rl.client_expiry),
+			time.Duration(app.cfg.Limiter.JanitorInterval),
+			time.Duration(app.cfg.Limiter.ClientExpiry),
 		)
 	}
 
