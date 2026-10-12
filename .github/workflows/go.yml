@@ -16,7 +16,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.26'
+          go-version: '1.26.3'
+
+      - name: Download modules
+        run: |
+          go env
+          go mod download
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -56,7 +61,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.26'
+          go-version: '1.26.3'
 
       - name: Cache Go modules
         uses: actions/cache@v4
