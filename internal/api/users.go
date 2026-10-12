@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/nongpal/Palge-Backend/internal/apperr"
-	"github.com/nongpal/Palge-Backend/internal/data"
+	"github.com/nongpal/Palge-Backend/internal/audit"
+	"github.com/nongpal/Palge-Backend/internal/token"
+	"github.com/nongpal/Palge-Backend/internal/user"
 	"github.com/nongpal/Palge-Backend/internal/validator"
 )
 
@@ -24,25 +26,25 @@ func (app *Application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 
 	v := validator.New()
 
-	user := &data.User{
+	usr := &user.User{
 		Name:      input.Name,
 		Email:     input.Email,
 		Activated: false,
 	}
 
-	if err := user.Password.Set(input.Password); err != nil {
+	if err := usr.Password.Set(input.Password); err != nil {
 		app.writeError(w, r, err)
 		return
 	}
 
-	data.ValidateUser(v, user)
+	user.ValidateUser(v, usr)
 	if !v.Valid() {
 		app.writeError(w, r, apperr.WithFields(apperr.CodeValidationFailed, v.Errors))
 		return
 	}
 
-	if err := app.models.Users.Insert(user); err != nil {
-		app.recordAuditLog(r, &data.AuditLog{
+	if err := app.users.Insert(usr); err != nil {
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     nil,
 			Action:     "register",
 			Resource:   "user",
@@ -54,7 +56,7 @@ func (app *Application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
+	token, err := app.tokens.New(usr.ID, 3*24*time.Hour, token.ScopeActivation)
 	if err != nil {
 		app.writeError(w, r, err)
 		return
@@ -63,24 +65,24 @@ func (app *Application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	app.background(func() {
 		data := map[string]any{
 			"activationToken": token.Plaintext,
-			"userID":          user.ID,
+			"userID":          usr.ID,
 		}
-		err = app.mailer.Send(user.Email, "user_welcome.tmpl.html", data)
+		err = app.mailer.Send(usr.Email, "user_welcome.tmpl.html", data)
 		if err != nil {
 			app.logger.Error(err.Error())
 		}
 	})
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     nil,
 		Action:     "register",
 		Resource:   "user",
-		ResourceID: &user.ID,
+		ResourceID: &usr.ID,
 		Result:     "success",
 	})
 
 	if err := app.writeJSON(w, http.StatusAccepted, envelope{
-		"user": user,
+		"user": usr,
 	}, nil); err != nil {
 		app.writeError(w, r, err)
 	}
@@ -98,8 +100,8 @@ func (app *Application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 
 	v := validator.New()
 
-	if data.ValidateTokenPlaintext(v, input.TokenPlaintext); !v.Valid() {
-		app.recordAuditLog(r, &data.AuditLog{
+	if token.ValidateTokenPlaintext(v, input.TokenPlaintext); !v.Valid() {
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     nil,
 			Action:     "activate",
 			Resource:   "user",
@@ -110,9 +112,9 @@ func (app *Application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := app.models.Users.GetForToken(data.ScopeActivation, input.TokenPlaintext)
+	user, err := app.users.GetForToken(token.ScopeActivation, input.TokenPlaintext)
 	if err != nil {
-		app.recordAuditLog(r, &data.AuditLog{
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     nil,
 			Action:     "activate",
 			Resource:   "user",
@@ -126,12 +128,12 @@ func (app *Application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 
 	user.Activated = true
 
-	if err := app.models.Users.Update(user); err != nil {
+	if err := app.users.Update(user); err != nil {
 		app.writeError(w, r, err)
 		return
 	}
 
-	if err := app.models.Permissions.AddForUser(
+	if err := app.permissions.AddForUser(
 		user.ID,
 		"accounts:read",
 		"accounts:create",
@@ -143,12 +145,12 @@ func (app *Application) activateUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := app.models.Tokens.DeleteAllForUser(data.ScopeActivation, user.ID); err != nil {
+	if err := app.tokens.DeleteAllForUser(token.ScopeActivation, user.ID); err != nil {
 		app.writeError(w, r, err)
 		return
 	}
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     &user.ID,
 		Action:     "activate",
 		Resource:   "user",
