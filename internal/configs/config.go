@@ -12,24 +12,24 @@ import (
 type Config struct {
 	Port int
 	Env  string
-	db   struct {
-		dsn string
+	DB   struct {
+		DSN string
 	}
-	smtp struct {
-		host     string
-		port     int
-		username string
-		password string
-		sender   string
+	SMTP struct {
+		Host     string
+		Port     int
+		Username string
+		Password string
+		Sender   string
 	}
 
-	rl struct {
-		enabled          bool
-		rps              float64
-		burst            float64
-		janitor_interval time.Duration
-		client_expiry    time.Duration
-		trustedProxies   []string
+	Limiter struct {
+		Enabled         bool
+		RPS             float64
+		Burst           float64
+		JanitorInterval time.Duration
+		ClientExpiry    time.Duration
+		TrustedProxies  []string
 	}
 }
 
@@ -38,20 +38,20 @@ func NewConfig(cfg *Config) {
 
 	cfg.Port = getEnvAsInt("PORT", 4000)
 	cfg.Env = getEnv("ENV", "development")
-	cfg.db.dsn = getEnv("DB_DSN", "postgres://postgres:postgres@localhost:5433/palge?sslmode=disable")
+	cfg.DB.DSN = getEnv("DB_DSN", "postgres://postgres:postgres@localhost:5433/palge?sslmode=disable")
 
-	cfg.smtp.host = getEnv("SMTP_HOST", "sandbox.smtp.mailtrap.io")
-	cfg.smtp.port = getEnvAsInt("SMTP_PORT", 2525)
-	cfg.smtp.username = getEnv("SMTP_USERNAME", "")
-	cfg.smtp.password = getEnv("SMTP_PASSWORD", "")
-	cfg.smtp.sender = getEnv("SMTP_SENDER", "Palge <no-reply@github.com/nongpal/Palge-Backend>")
+	cfg.SMTP.Host = getEnv("SMTP_HOST", "sandbox.smtp.mailtrap.io")
+	cfg.SMTP.Port = getEnvAsInt("SMTP_PORT", 2525)
+	cfg.SMTP.Username = getEnv("SMTP_USERNAME", "")
+	cfg.SMTP.Password = getEnv("SMTP_PASSWORD", "")
+	cfg.SMTP.Sender = getEnv("SMTP_SENDER", "Palge <no-reply@github.com/nongpal/Palge-Backend>")
 
-	cfg.rl.enabled = getEnvAsBool("RATE_LIMIT_ENABLED", true)
-	cfg.rl.rps = getEnvAsFloat("RATE_LIMIT_RPS", 2)
-	cfg.rl.burst = getEnvAsFloat("RATE_LIMIT_BURST", 4)
-	cfg.rl.janitor_interval = getEnvAsTime("RATE_LIMIT_JANITOR_INTERVAL", 1*time.Minute)
-	cfg.rl.client_expiry = getEnvAsTime("RATE_LIMIT_CLIENT_EXPIRY", 10*time.Minute)
-	cfg.rl.trustedProxies = getEnvAsSlice("RATE_LIMIT_TRUSTED_PROXIES", []string{})
+	cfg.Limiter.Enabled = getEnvAsBool("RATE_LIMIT_ENABLED", true)
+	cfg.Limiter.RPS = getEnvAsFloat("RATE_LIMIT_RPS", 2)
+	cfg.Limiter.Burst = getEnvAsFloat("RATE_LIMIT_BURST", 4)
+	cfg.Limiter.JanitorInterval = getEnvAsTime("RATE_LIMIT_JANITOR_INTERVAL", 1*time.Minute)
+	cfg.Limiter.ClientExpiry = getEnvAsTime("RATE_LIMIT_CLIENT_EXPIRY", 10*time.Minute)
+	cfg.Limiter.TrustedProxies = getEnvAsSlice("RATE_LIMIT_TRUSTED_PROXIES", []string{})
 }
 
 func getEnv(key, defaultValue string) string {
