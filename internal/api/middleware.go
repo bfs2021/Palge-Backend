@@ -8,7 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nongpal/Palge-Backend/internal/apperr"
-	"github.com/nongpal/Palge-Backend/internal/data"
+	"github.com/nongpal/Palge-Backend/internal/audit"
+	"github.com/nongpal/Palge-Backend/internal/token"
+	"github.com/nongpal/Palge-Backend/internal/user"
 	"github.com/nongpal/Palge-Backend/internal/validator"
 )
 
@@ -23,7 +25,7 @@ func (app *Application) authenticate(next http.Handler) http.Handler {
 		authorizationHeader := r.Header.Get("Authorization")
 
 		if authorizationHeader == "" {
-			r = app.contextSetUser(r, data.AnonymousUser)
+			r = app.contextSetUser(r, user.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -34,16 +36,16 @@ func (app *Application) authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		token := headerParts[1]
+		tkn := headerParts[1]
 
 		v := validator.New()
 
-		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
+		if token.ValidateTokenPlaintext(v, tkn); !v.Valid() {
 			app.writeError(w, r, apperr.New(apperr.CodeInvalidToken))
 			return
 		}
 
-		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		user, err := app.users.GetForToken(token.ScopeAuthentication, tkn)
 		if err != nil {
 			app.writeError(w, r, err)
 			return
@@ -86,14 +88,14 @@ func (app *Application) requirePermission(code string, next http.HandlerFunc) ht
 	fn := func(w http.ResponseWriter, r *http.Request) {
 		user := app.contextGetUser(r)
 
-		permission, err := app.models.Permissions.GetAllForUser(user.ID)
+		permission, err := app.permissions.GetAllForUser(user.ID)
 		if err != nil {
 			app.writeError(w, r, err)
 			return
 		}
 
 		if !permission.Include(code) {
-			app.recordAuditLog(r, &data.AuditLog{
+			app.recordAuditLog(r, &audit.AuditLog{
 				UserID:     &user.ID,
 				Action:     "authorize",
 				Resource:   "account",
