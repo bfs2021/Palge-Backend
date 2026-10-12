@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/nongpal/Palge-Backend/internal/account"
 	"github.com/nongpal/Palge-Backend/internal/apperr"
-	"github.com/nongpal/Palge-Backend/internal/data"
+	"github.com/nongpal/Palge-Backend/internal/audit"
 	"github.com/nongpal/Palge-Backend/internal/validator"
 )
 
@@ -21,29 +22,29 @@ func (app *Application) createAccountHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	account := &data.Account{
+	acc := &account.Account{
 		Owner:   input.Owner,
 		Balance: input.InitialBalance,
 	}
 
 	v := validator.New()
 
-	data.ValidateAccount(v, account)
+	account.ValidateAccount(v, acc)
 
 	if !v.Valid() {
 		app.writeError(w, r, apperr.WithFields(apperr.CodeValidationFailed, v.Errors))
 		return
 	}
 
-	if err = app.models.Accounts.Insert(r.Context(), account); err != nil {
+	if err = app.accounts.Insert(r.Context(), acc); err != nil {
 		app.writeError(w, r, err)
 		return
 	}
 
 	headers := make(http.Header)
-	headers.Set("Location", fmt.Sprintf("/v1/accounts/%d", account.ID))
+	headers.Set("Location", fmt.Sprintf("/v1/accounts/%d", acc.ID))
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"account": account}, headers)
+	err = app.writeJSON(w, http.StatusCreated, envelope{"account": acc}, headers)
 
 	if err != nil {
 		app.writeError(w, r, err)
@@ -51,7 +52,7 @@ func (app *Application) createAccountHandler(w http.ResponseWriter, r *http.Requ
 }
 
 func (app *Application) listAccountHandler(w http.ResponseWriter, r *http.Request) {
-	accounts, err := app.models.Accounts.GetAll(r.Context())
+	accounts, err := app.accounts.GetAll(r.Context())
 	if err != nil {
 		app.writeError(w, r, err)
 		return
@@ -73,7 +74,7 @@ func (app *Application) showAccountHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	account, err := app.models.Accounts.Get(r.Context(), id)
+	account, err := app.accounts.Get(r.Context(), id)
 	if err != nil {
 		app.writeError(w, r, err)
 		return
@@ -103,7 +104,7 @@ func (app *Application) depositHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v := validator.New()
-	data.ValidateAmount(v, input.Amount)
+	account.ValidateAmount(v, input.Amount)
 
 	if !v.Valid() {
 		app.writeError(w, r, apperr.WithFields(apperr.CodeValidationFailed, v.Errors))
@@ -112,14 +113,14 @@ func (app *Application) depositHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
 
-	account, err := app.models.Accounts.Deposit(
+	account, err := app.accounts.Deposit(
 		r.Context(),
 		id,
 		input.Amount,
 	)
 
 	if err != nil {
-		app.recordAuditLog(r, &data.AuditLog{
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     &user.ID,
 			Action:     "deposit",
 			Resource:   "account",
@@ -131,7 +132,7 @@ func (app *Application) depositHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     &user.ID,
 		Action:     "deposit",
 		Resource:   "account",
@@ -168,16 +169,16 @@ func (app *Application) withdrawHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	v := validator.New()
-	if data.ValidateAmount(v, input.Amount); !v.Valid() {
+	if account.ValidateAmount(v, input.Amount); !v.Valid() {
 		app.writeError(w, r, apperr.WithFields(apperr.CodeValidationFailed, v.Errors))
 		return
 	}
 
 	user := app.contextGetUser(r)
 
-	account, err := app.models.Accounts.Withdraw(r.Context(), id, input.Amount)
+	account, err := app.accounts.Withdraw(r.Context(), id, input.Amount)
 	if err != nil {
-		app.recordAuditLog(r, &data.AuditLog{
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     &user.ID,
 			Action:     "withdraw",
 			Resource:   "account",
@@ -189,7 +190,7 @@ func (app *Application) withdrawHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     &user.ID,
 		Action:     "withdraw",
 		Resource:   "account",
@@ -217,7 +218,7 @@ func (app *Application) transferHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	v := validator.New()
-	data.ValidateAmount(v, input.Amount)
+	account.ValidateAmount(v, input.Amount)
 	v.Check(input.From > 0, "from", "must be a valid account ID")
 	v.Check(input.To > 0, "to", "must be a valid account ID")
 	v.Check(input.From != input.To, "to", "cannot transfer to the same account")
@@ -229,9 +230,9 @@ func (app *Application) transferHandler(w http.ResponseWriter, r *http.Request) 
 
 	user := app.contextGetUser(r)
 
-	sender, receiver, err := app.models.Accounts.Transfer(r.Context(), input.From, input.To, input.Amount)
+	sender, receiver, err := app.accounts.Transfer(r.Context(), input.From, input.To, input.Amount)
 	if err != nil {
-		app.recordAuditLog(r, &data.AuditLog{
+		app.recordAuditLog(r, &audit.AuditLog{
 			UserID:     &user.ID,
 			Action:     "transfer",
 			Resource:   "account",
@@ -243,7 +244,7 @@ func (app *Application) transferHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	app.recordAuditLog(r, &data.AuditLog{
+	app.recordAuditLog(r, &audit.AuditLog{
 		UserID:     &user.ID,
 		Action:     "transfer",
 		Resource:   "account",
@@ -252,7 +253,7 @@ func (app *Application) transferHandler(w http.ResponseWriter, r *http.Request) 
 	})
 
 	err = app.writeJSON(w, http.StatusOK, envelope{
-		"transfer": map[string]*data.Account{
+		"transfer": map[string]*account.Account{
 			"from": sender,
 			"to":   receiver,
 		},
