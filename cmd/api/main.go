@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 
@@ -15,7 +16,7 @@ func main() {
 	}
 }
 
-func run() error {
+func run() (err error) {
 	var cfg configs.Config
 	configs.NewConfig(&cfg)
 
@@ -24,7 +25,11 @@ func run() error {
 		return err
 	}
 
-	defer app.Close()
+	defer func() {
+		if closeErr := app.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	return app.Run()
 }
