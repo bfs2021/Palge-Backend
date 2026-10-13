@@ -105,9 +105,7 @@ func (m *Model) Insert(user *User) error {
 		&user.Version,
 	)
 
-	var pgErr *pgconn.PgError
-
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch {
 		case pgErr.Code == "23505" &&
 			pgErr.ConstraintName == "users_email_key":
@@ -175,9 +173,8 @@ func (m *Model) Update(user *User) error {
 	defer cancel()
 
 	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&user.Version)
-	var pgErr *pgconn.PgError
 
-	if errors.As(err, &pgErr) {
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok {
 		if pgErr.Code == "23505" &&
 			pgErr.ConstraintName == "users_email_key" {
 			return apperr.Field(apperr.CodeDuplicateEmail, "email", "a user with this email address already exists")

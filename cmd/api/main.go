@@ -2,23 +2,29 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/nongpal/Palge-Backend/internal/api"
 	"github.com/nongpal/Palge-Backend/internal/configs"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	var cfg configs.Config
 	configs.NewConfig(&cfg)
 
 	app, err := api.NewApplication(cfg)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	defer app.Close()
 
-	if err := app.Run(); err != nil {
-		log.Fatal(err)
-	}
+	return app.Run()
 }

@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -124,8 +125,8 @@ func (app *Application) getRealIP(r *http.Request) string {
 
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
-		for i := len(parts) - 1; i >= 0; i-- {
-			ip := strings.TrimSpace(parts[i])
+		for _, part := range slices.Backward(parts) {
+			ip := strings.TrimSpace(part)
 			if parsed, ok := netip.ParseAddr(ip); ok == nil && !app.isTrustedProxies(parsed.String()) {
 				return parsed.String()
 			}
