@@ -86,8 +86,7 @@ func Wrap(code Code, cause error) *Error {
 }
 
 func Is(err error, code Code) bool {
-	var aerr *Error
-	if errors.As(err, &aerr) {
+	if aerr, ok := errors.AsType[*Error](err); ok {
 		return aerr.code == code
 	}
 	return false

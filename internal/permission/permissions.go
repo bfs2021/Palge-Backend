@@ -3,6 +3,7 @@ package permission
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"slices"
 	"time"
 )
@@ -17,7 +18,7 @@ type Model struct {
 	DB *sql.DB
 }
 
-func (m *Model) GetAllForUser(userID int64) (Permission, error) {
+func (m *Model) GetAllForUser(userID int64) (perm Permission, err error) {
 	query := `
 	SELECT permissions.code
 	FROM permissions
@@ -33,14 +34,16 @@ func (m *Model) GetAllForUser(userID int64) (Permission, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		err = errors.Join(err, rows.Close())
+	}()
 
 	var permissions Permission
 
 	for rows.Next() {
 		var permission string
 
-		err := rows.Scan(&permission)
+		err = rows.Scan(&permission)
 		if err != nil {
 			return nil, err
 		}

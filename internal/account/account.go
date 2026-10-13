@@ -29,15 +29,19 @@ func ValidateAmount(v *validator.Validator, amount int64) {
 	v.Check(amount > 0, "amount", "must be greater than 0")
 }
 
-func (m *Model) execInTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+func (m *Model) execInTx(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
 	tx, err := m.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	defer tx.Rollback()
+	defer func() {
+		if rbErr := tx.Rollback(); rbErr != nil && !errors.Is(rbErr, sql.ErrTxDone) {
+			err = errors.Join(err, rbErr)
+		}
+	}()
 
-	if err := fn(tx); err != nil {
+	if err = fn(tx); err != nil {
 		return err
 	}
 
@@ -94,14 +98,18 @@ func (a *Model) GetAll(ctx context.Context) ([]*Account, error) {
 		return nil, err
 	}
 
-	defer rows.Close()
+	defer func() {
+		if rows != nil {
+			err = errors.Join(err, rows.Close())
+		}
+	}()
 
 	var accounts []*Account
 
 	for rows.Next() {
 		var account Account
 
-		err := rows.Scan(
+		err = rows.Scan(
 			&account.ID, &account.Owner, &account.Balance,
 		)
 
@@ -180,15 +188,15 @@ func (m *Model) Transfer(ctx context.Context, from, to, amount int64) (*Account,
 		return nil, nil, apperr.New(apperr.CodeSameAccountTransfer)
 	}
 	var sender, receiver Account
-	err := m.execInTx(ctx, func(tx *sql.Tx) error {
+	err := m.execInTx(ctx, func(tx *sql.Tx) (err error) {
 		firstID, secondID := from, to
 		if from > to {
 			firstID, secondID = to, from
 		}
 
 		queryLock := `
-		SELECT id, owner, balance 
-		FROM accounts 
+		SELECT id, owner, balance
+		FROM accounts
 		WHERE id in ($1, $2)
 		ORDER BY id
 		FOR UPDATE
@@ -197,6 +205,15 @@ func (m *Model) Transfer(ctx context.Context, from, to, amount int64) (*Account,
 		if err != nil {
 			return err
 		}
+
+		defer func() {
+			if rows != nil {
+				err = errors.Join(
+					err,
+					rows.Close(),
+				)
+			}
+		}()
 
 		accounts := make(map[int64]*Account)
 		for rows.Next() {
@@ -215,7 +232,9 @@ func (m *Model) Transfer(ctx context.Context, from, to, amount int64) (*Account,
 			return err
 		}
 
-		rows.Close()
+		if err := rows.Close(); err != nil {
+			return err
+		}
 
 		accFrom, existFrom := accounts[from]
 		_, existTo := accounts[to]

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"strconv"
@@ -67,20 +68,21 @@ func (app *Application) readJSON(w http.ResponseWriter, r *http.Request, dst any
 }
 
 func (app *Application) writeJSON(w http.ResponseWriter, status int, data envelope, headers http.Header) error {
-	js, err := json.MarshalIndent(data, "", "\t")
+	js, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
 
 	js = append(js, '\n')
 
-	for key, value := range headers {
-		w.Header()[key] = value
-	}
+	maps.Copy(w.Header(), headers)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	w.Write(js)
+	_, err = w.Write(js)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -109,9 +111,7 @@ func (app *Application) readIDParam(r *http.Request) (int64, error) {
 }
 
 func (app *Application) background(fn func()) {
-	app.wg.Add(1)
-	go func() {
-		defer app.wg.Done()
+	app.wg.Go(func() {
 		defer func() {
 			if err := recover(); err != nil {
 				app.logger.Error(fmt.Sprintf("%v", err))
@@ -119,7 +119,7 @@ func (app *Application) background(fn func()) {
 		}()
 
 		fn()
-	}()
+	})
 }
 
 func clientIP(r *http.Request) string {
