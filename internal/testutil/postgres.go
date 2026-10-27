@@ -28,7 +28,10 @@ func NewTestDB(t testing.TB) *sql.DB {
 	db.SetMaxIdleConns(5)
 
 	t.Cleanup(func() {
-		db.Close()
+		err := db.Close()
+		if err != nil {
+			t.Errorf("close database: %v", err)
+		}
 	})
 
 	ctx, cancel := context.WithTimeout(
