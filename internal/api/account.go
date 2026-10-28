@@ -25,6 +25,7 @@ func (app *Application) createAccountHandler(w http.ResponseWriter, r *http.Requ
 	acc := &account.Account{
 		Owner:   input.Owner,
 		Balance: input.InitialBalance,
+		UserID:  app.contextGetUser(r).ID,
 	}
 
 	v := validator.New()
