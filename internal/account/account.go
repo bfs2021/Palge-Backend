@@ -51,20 +51,22 @@ func (m *Model) execInTx(ctx context.Context, fn func(tx *sql.Tx) error) (err er
 
 func (m *Model) Insert(ctx context.Context, account *Account) error {
 	query := `
-		INSERT INTO accounts (owner, balance)
-		VALUES ($1, $2)
+		INSERT INTO accounts (owner, balance, user_id)
+		VALUES ($1, $2, NULLIF($3, 0))
 		RETURNING id
 	`
 
-	return m.DB.QueryRowContext(ctx, query, account.Owner, account.Balance).Scan(&account.ID)
+	return m.DB.QueryRowContext(ctx, query, account.Owner, account.Balance, account.UserID).Scan(&account.ID)
 }
 
 func (m *Model) Get(ctx context.Context, id int64) (*Account, error) {
 	if id < 1 {
 		return nil, apperr.New(apperr.CodeRecordNotFound)
 	}
+	// COALESCE keeps accounts created before user_id existed readable: their
+	// owner is nobody, and an ownership check rejects them.
 	query := `
-		SELECT id, owner, balance
+		SELECT id, owner, balance, COALESCE(user_id, 0)
 		FROM accounts
 		WHERE id = $1
 	`
@@ -75,6 +77,7 @@ func (m *Model) Get(ctx context.Context, id int64) (*Account, error) {
 		&account.ID,
 		&account.Owner,
 		&account.Balance,
+		&account.UserID,
 	)
 
 	if err != nil {

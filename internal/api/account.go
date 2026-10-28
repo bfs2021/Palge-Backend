@@ -114,6 +114,17 @@ func (app *Application) depositHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := app.contextGetUser(r)
 
+	acc, err := app.accounts.Get(r.Context(), id)
+	if err != nil {
+		app.writeError(w, r, err)
+		return
+	}
+
+	if acc.UserID != user.ID {
+		app.writeError(w, r, apperr.New(apperr.CodePermissionDenied))
+		return
+	}
+
 	account, err := app.accounts.Deposit(
 		r.Context(),
 		id,
@@ -177,6 +188,17 @@ func (app *Application) withdrawHandler(w http.ResponseWriter, r *http.Request) 
 
 	user := app.contextGetUser(r)
 
+	acc, err := app.accounts.Get(r.Context(), id)
+	if err != nil {
+		app.writeError(w, r, err)
+		return
+	}
+
+	if acc.UserID != user.ID {
+		app.writeError(w, r, apperr.New(apperr.CodePermissionDenied))
+		return
+	}
+
 	account, err := app.accounts.Withdraw(r.Context(), id, input.Amount)
 	if err != nil {
 		app.recordAuditLog(r, &audit.AuditLog{
@@ -230,6 +252,22 @@ func (app *Application) transferHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	user := app.contextGetUser(r)
+
+	// Both ends of the transfer must belong to the user: debiting an account
+	// they do not own takes someone else's money, and crediting one moves it
+	// outside their reach.
+	for _, id := range []int64{input.From, input.To} {
+		acc, err := app.accounts.Get(r.Context(), id)
+		if err != nil {
+			app.writeError(w, r, err)
+			return
+		}
+
+		if acc.UserID != user.ID {
+			app.writeError(w, r, apperr.New(apperr.CodePermissionDenied))
+			return
+		}
+	}
 
 	sender, receiver, err := app.accounts.Transfer(r.Context(), input.From, input.To, input.Amount)
 	if err != nil {
