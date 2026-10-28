@@ -12,6 +12,7 @@ import (
 
 type Account struct {
 	ID      int64  `json:"id"`
+	UserID  int64  `json:"-"`
 	Owner   string `json:"owner"`
 	Balance int64  `json:"balance"`
 }
